@@ -11,41 +11,26 @@ int main(int argc, char* argv[])
 	SDL_Variables SDLvariables;
 	Time_Variables timeVariables = {0,0};
 	Ball ball;
+	Hole hole;
 	bool gameRunning = true;
-	SDL_Event event;
 
-
-	if (initSDL(SDLvariables) < 0) return -1;
-	if (initBall(SDLvariables, ball) < 0) return -1;
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-	SDL_RenderSetLogicalSize(SDLvariables.renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+	if (gameStart(SDLvariables, ball, hole) < 0) return -1;
 
 	while (gameRunning)
 	{
 		timeVariables.frameStart = SDL_GetTicks();
-
-		SDL_SetRenderDrawColor(SDLvariables.renderer, 0, 135, 0, SDL_ALPHA_OPAQUE);
-		SDL_RenderClear(SDLvariables.renderer);
-		SDL_RenderCopy(SDLvariables.renderer, ball.ballTexture, NULL, &ball.boxModel);
-		SDL_RenderPresent(SDLvariables.renderer);
 		
-		//update times
-		timeVariables.frameTime = SDL_GetTicks() - timeVariables.frameStart;
-
 		//update ball
-		updateBall(ball, timeVariables.frameTime);
-		calculateCollisions(ball);
+		updateBall(ball,timeVariables.frameTime, hole);
+		
+		//handle event
+		gameHandleEvents(ball, gameRunning);
 
-		//handle events
-		while (SDL_PollEvent(&event))
-		{
-			switch (event.type) {
-				case SDL_QUIT:
-					gameRunning = false;
-					break;
-			}
-		}
+		//render
+		gameRender(SDLvariables, ball, hole);
+
+		//update time
+		timeVariables.frameTime = SDL_GetTicks() - timeVariables.frameStart;
 	}
 
 
