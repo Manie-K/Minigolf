@@ -4,9 +4,8 @@
 
 int initSDL(SDL_Variables& vars);
 int initBall(SDL_Variables vars, Ball& ball);
-void updateBall(Ball& ball, double frameTime, Hole hole);
 void calculateCollisions(Ball& ball);
-void shootBall(Ball& ball);
+void shootBall(Ball& ball, Player& player);
 int initHole(Hole& hole, SDL_Variables vars);
 void ballPositionUpdate(Ball& ball, double frameTime);
 void ballSpeedUpdate(Ball& ball);
@@ -16,6 +15,14 @@ void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int length
 void visualiseShot(Ball ball, SDL_Renderer* renderer);
 void drawBackground(SDL_Renderer* renderer);
 
-int gameStart(SDL_Variables&SDLvariables, Ball& ball, Hole& hole);
-void gameRender(SDL_Variables &SDLvariables, Ball &ball, Hole &hole);
-void gameHandleEvents(Ball& ball, bool& gameRunning);
+int gameStart(SDL_Variables&SDLvariables, Ball& ball, Hole& hole, Level& level);
+void gameRender(SDL_Variables &SDLvariables, Ball &ball, Hole &hole, Level level);
+void gameHandleEvents(Ball& ball, bool& gameRunning, Player& player);
+void gameUpdate(Ball& ball, double frameTime, Hole hole, Level level, Player& player);
+
+
+void drawObstacles(SDL_Renderer* renderer, Level level);
+void obstaclesCollision(Ball& ball, Level level);
+bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball);
+bool pointInRectangle(SDL_Point p, SDL_Rect rect);
+void loadLevel(Level& level);

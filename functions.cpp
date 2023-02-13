@@ -1,5 +1,7 @@
 #include "functions.h"
 #include <iostream>
+#include <string>
+#include <fstream>
 
 using namespace std;
 
@@ -79,21 +81,6 @@ int initHole(Hole& hole, SDL_Variables vars) {
 	return 0;
 }
 
-void updateBall(Ball& ball, double frameTime, Hole hole)
-{
-	//ball update
-	ballPositionUpdate(ball, frameTime);
-	ballSpeedUpdate(ball);
-	ballBoxModelUpdate(ball);
-
-	//checks collision with screen
-	calculateCollisions(ball);
-
-	//checks collision with obstacles
-
-	//checks win
-	checkWin(ball, hole);
-}
 void ballPositionUpdate(Ball& ball, double frameTime) {
 	int temp;
 
@@ -166,7 +153,7 @@ void calculateCollisions(Ball& ball)
 	}
 }
 
-void shootBall(Ball& ball){
+void shootBall(Ball& ball, Player &player){
 	double power;
 	double cos, sin;
 	const double powerScale = 0.01;
@@ -195,6 +182,8 @@ void shootBall(Ball& ball){
 	ball.Yspeed = powerScale * power * sin;
 	ball.isMoving = true;
 	ball.drawArrow = false;
+	player.shotsTotal++;
+	player.shotsPerLevel++;
 }
 
 bool checkWin(Ball& ball, Hole hole) {
@@ -288,25 +277,27 @@ void drawBackground(SDL_Renderer* renderer) {
 	SDL_FreeSurface(grassSurface);
 }
 
-int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole)
+int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level)
 {
 	if (initSDL(SDLvariables) < 0) return -1;
 	if (initBall(SDLvariables, ball) < 0) return -1;
 	if (initHole(hole, SDLvariables) < 0) return -1;
+	loadLevel(level);
 	return 1;
 }
-void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole)
+void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level)
 {
 	SDL_SetRenderDrawColor(SDLvariables.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(SDLvariables.renderer);
 	drawBackground(SDLvariables.renderer);											//draws backgorund
+	drawObstacles(SDLvariables.renderer, level);									//draws obstacles
 	SDL_RenderCopy(SDLvariables.renderer, hole.holeTexture, NULL, &hole.drawModel); //draws hole
 	SDL_RenderCopy(SDLvariables.renderer, ball.ballTexture, NULL, &ball.boxModel);  //draws ball
 	if (ball.drawArrow)
 		visualiseShot(ball, SDLvariables.renderer);									//draws arrow when shooting
 	SDL_RenderPresent(SDLvariables.renderer);
 }
-void gameHandleEvents(Ball& ball, bool& gameRunning)
+void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player)
 {
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
@@ -317,7 +308,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning)
 			break;
 		case SDL_MOUSEBUTTONUP:
 			if (event.button.button == SDL_BUTTON_LEFT && ball.isMoving == false) {
-				shootBall(ball);
+				shootBall(ball,player);
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -326,4 +317,142 @@ void gameHandleEvents(Ball& ball, bool& gameRunning)
 			break;
 		}
 	}
+}
+void gameUpdate(Ball& ball, double frameTime, Hole hole, Level level, Player& player)
+{
+	//ball update
+	ballPositionUpdate(ball, frameTime);
+	ballSpeedUpdate(ball);
+	ballBoxModelUpdate(ball);
+
+	//checks collision with screen
+	calculateCollisions(ball);
+
+	//checks collision with obstacles
+	obstaclesCollision(ball, level);
+
+	//checks win
+	if (checkWin(ball, hole)) {
+		//update player
+		int tempScore = level.levelScore - (player.shotsPerLevel - level.levelFreeShots) * 100;
+		player.score += tempScore > 0 ? tempScore : 0;
+		player.shotsPerLevel = 0;
+
+		//load next level
+		level.levelID++;
+		loadLevel(level);
+	}
+}
+
+void drawObstacles(SDL_Renderer* renderer, Level level) 
+{
+	SDL_Surface* obstacleSurface = IMG_Load("assets/obstacle.png");
+	SDL_Texture* temp = SDL_CreateTextureFromSurface(renderer, obstacleSurface);
+	for (SDL_Rect obstacle : level.obstacles) {
+		SDL_RenderCopy(renderer, temp, NULL, &obstacle);
+	}
+	SDL_FreeSurface(obstacleSurface);
+}
+void obstaclesCollision(Ball& ball, Level level) 
+{
+	for (SDL_Rect obstacle : level.obstacles)
+	{
+		if (circleRectangleCollision(obstacle, ball)) {
+			//play sound
+			break;
+		}
+	}
+}
+
+bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball) 
+{
+	int halfWidth = obstacle.w / 2;
+	int halfHeight = obstacle.h / 2;
+	
+	int x = ball.x, y = ball.y, r = ball.radius;
+
+	int disX, disY;
+	disX = abs(x - (obstacle.x + halfWidth));
+	disY = abs(y - (obstacle.y + halfHeight));
+
+	if (disX > halfWidth + r || disY > halfHeight + r) return false;
+
+	if (pointInRectangle({x-r,y}, obstacle) || pointInRectangle({x+r,y}, obstacle)) {
+		ball.Xspeed *= -1;
+		if (x <= obstacle.x)
+			ball.x = obstacle.x - r - 1;
+		else
+			ball.x = obstacle.x + obstacle.w + r + 1;
+		return true;
+	}
+	if (pointInRectangle({ x,y-r }, obstacle) || pointInRectangle({ x,y+r }, obstacle)) {
+		ball.Yspeed *= -1;
+
+		if (y <= obstacle.y)
+			ball.y = obstacle.y - r;
+		else
+			ball.y = obstacle.y + obstacle.h + r + 1;
+
+		return true;
+	}
+
+	int disCorner = pow(disX - halfWidth, 2) + pow(disY-halfHeight, 2);
+	if (disCorner <= pow(r, 2)) {
+		ball.Xspeed *= -1;
+		ball.Yspeed *= -1;
+		if (x <= obstacle.x) 
+		{
+			if (y <= obstacle.y)
+			{
+				ball.x = obstacle.x - r - 1;
+				ball.y = obstacle.y - r;
+			}
+			else
+			{
+				ball.x = obstacle.x - r - 1;
+				ball.y = obstacle.y + obstacle.h + r + 1;
+			}
+		}
+		else 
+		{
+			if (y <= obstacle.y)
+			{
+				ball.x = obstacle.x + obstacle.w + r + 1;
+				ball.y = obstacle.y - r;
+			}
+			else
+			{
+				ball.x = obstacle.x + obstacle.w + r + 1;
+				ball.y = obstacle.y + obstacle.h + r + 1;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+bool pointInRectangle(SDL_Point p, SDL_Rect rect) {
+	return (p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h);
+}
+void loadLevel(Level& level) {
+	string fileName = "levels/";
+	if (level.levelID < 10) {
+		fileName += "0";
+	}
+	fileName += to_string(level.levelID);	
+	fileName += ".txt";
+
+	ifstream file;
+	file.open(fileName);
+
+	while (file) {
+		file >> level.levelScore >> level.levelFreeShots;
+		file >> level.holePos.x >> level.holePos.y >> level.ballPos.x >> level.ballPos.y;
+		while (file) {
+			SDL_Rect temp;
+			file >> temp.x >> temp.y >> temp.w >> temp.h;
+			level.obstacles.push_back(temp);
+		}
+	}
+
+	file.close();
 }

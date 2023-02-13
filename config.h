@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL.h>
 #include <SDL_image.h>
+#include <vector>
 
 #define BALL_FRICTION 0.005
 #define MAX_POWER 150
@@ -40,4 +41,21 @@ struct Hole {
 	SDL_Rect boxModel;
 	SDL_Rect drawModel;
 	SDL_Texture* holeTexture;
+};
+
+struct Level {
+	short int levelID;
+	short int levelScore;
+	short int levelFreeShots;
+	typedef struct {
+		int x, y;
+	} Point;
+	Point holePos, ballPos;
+	std::vector<SDL_Rect> obstacles;
+};
+
+struct Player {
+	int score;
+	int shotsTotal;
+	int shotsPerLevel;
 };
