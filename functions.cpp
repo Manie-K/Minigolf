@@ -26,23 +26,11 @@ int initSDL(SDL_Variables& vars) {
 	}
 	return 0;
 }
-int initBall(SDL_Variables vars, Ball &ball)
+int initBall(SDL_Variables vars, Ball &ball, Level& level)
 {
 	const char* ballImagePath = "assets/ball.png";
 
-	ball.x = SCREEN_WIDTH/2;
-	ball.xPosBuffer = 0;
-	
-	ball.y = SCREEN_HEIGHT/2;
-	ball.yPosBuffer = 0;
-
-	ball.size = 24;
-	ball.radius = ball.size / 2;
-
-	ball.Xspeed = ball.Yspeed = 0;
-
-	ball.isMoving = false;
-	ball.drawArrow = false;
+	ballSet(ball, level);
 
 	SDL_Rect temp;
 	temp.x = ball.x - ball.radius;
@@ -60,15 +48,9 @@ int initBall(SDL_Variables vars, Ball &ball)
 
 	return 0;
 }
-int initHole(Hole& hole, SDL_Variables vars) {
-	hole.x = 40;
-	hole.y = 140;
-	hole.boxModel.x = hole.drawModel.x = hole.x - hole.radius;
-	hole.boxModel.y = hole.y - hole.radius;
-	hole.boxModel.w = hole.boxModel.h = hole.drawModel.w= hole.size;
-	hole.drawModel.h = 2 * hole.size;
-	hole.drawModel.y = hole.boxModel.y - hole.size;
-
+int initHole(Hole& hole, SDL_Variables vars, Level& level) 
+{
+	holeSetPosition(hole, level);
 	const char* holeImagePath = "assets/hole.png";
 
 	SDL_Surface* tempSurface = IMG_Load(holeImagePath);
@@ -79,6 +61,31 @@ int initHole(Hole& hole, SDL_Variables vars) {
 	}
 	SDL_FreeSurface(tempSurface);
 	return 0;
+}
+void holeSetPosition(Hole& hole, Level level) {
+	hole.x = level.holePos.x;
+	hole.y = level.holePos.y;
+	hole.boxModel.x = hole.drawModel.x = hole.x - hole.radius;
+	hole.boxModel.y = hole.y - hole.radius;
+	hole.boxModel.w = hole.boxModel.h = hole.drawModel.w = hole.size;
+	hole.drawModel.h = 2 * hole.size;
+	hole.drawModel.y = hole.boxModel.y - hole.size;
+}
+void ballSet(Ball& ball, Level level)
+{
+	ball.x = level.ballPos.x;
+	ball.xPosBuffer = 0;
+
+	ball.y = level.ballPos.y;
+	ball.yPosBuffer = 0;
+
+	ball.size = 24;
+	ball.radius = ball.size / 2;
+
+	ball.Xspeed = ball.Yspeed = 0;
+
+	ball.isMoving = false;
+	ball.drawArrow = false;
 }
 
 void ballPositionUpdate(Ball& ball, double frameTime) {
@@ -280,9 +287,9 @@ void drawBackground(SDL_Renderer* renderer) {
 int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level)
 {
 	if (initSDL(SDLvariables) < 0) return -1;
-	if (initBall(SDLvariables, ball) < 0) return -1;
-	if (initHole(hole, SDLvariables) < 0) return -1;
 	loadLevel(level);
+	if (initBall(SDLvariables, ball, level) < 0) return -1;
+	if (initHole(hole, SDLvariables, level) < 0) return -1;
 	return 1;
 }
 void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level)
@@ -318,7 +325,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player)
 		}
 	}
 }
-void gameUpdate(Ball& ball, double frameTime, Hole hole, Level level, Player& player)
+void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player)
 {
 	//ball update
 	ballPositionUpdate(ball, frameTime);
@@ -340,18 +347,20 @@ void gameUpdate(Ball& ball, double frameTime, Hole hole, Level level, Player& pl
 
 		//load next level
 		level.levelID++;
+		level.obstacles.clear();
 		loadLevel(level);
+		ballSet(ball, level);
+		holeSetPosition(hole, level);
 	}
 }
 
 void drawObstacles(SDL_Renderer* renderer, Level level) 
 {
-	SDL_Surface* obstacleSurface = IMG_Load("assets/obstacle.png");
-	SDL_Texture* temp = SDL_CreateTextureFromSurface(renderer, obstacleSurface);
 	for (SDL_Rect obstacle : level.obstacles) {
+		SDL_Surface* tempSurf = getObstacleSurface(obstacle);
+		SDL_Texture* temp = SDL_CreateTextureFromSurface(renderer, tempSurf);
 		SDL_RenderCopy(renderer, temp, NULL, &obstacle);
 	}
-	SDL_FreeSurface(obstacleSurface);
 }
 void obstaclesCollision(Ball& ball, Level level) 
 {
@@ -396,7 +405,7 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 		return true;
 	}
 
-	int disCorner = pow(disX - halfWidth, 2) + pow(disY-halfHeight, 2);
+	double disCorner = pow(disX - halfWidth, 2) + pow(disY-halfHeight, 2);
 	if (disCorner <= pow(r, 2)) {
 		ball.Xspeed *= -1;
 		ball.Yspeed *= -1;
@@ -447,7 +456,9 @@ void loadLevel(Level& level) {
 	while (file) {
 		file >> level.levelScore >> level.levelFreeShots;
 		file >> level.holePos.x >> level.holePos.y >> level.ballPos.x >> level.ballPos.y;
-		while (file) {
+		int obstaclesCount;
+		file >> obstaclesCount;
+		for(int x = 0; x < obstaclesCount;x++) {
 			SDL_Rect temp;
 			file >> temp.x >> temp.y >> temp.w >> temp.h;
 			level.obstacles.push_back(temp);
@@ -455,4 +466,31 @@ void loadLevel(Level& level) {
 	}
 
 	file.close();
+}
+
+
+SDL_Surface* getObstacleSurface(SDL_Rect rectangle) {
+	SDL_Surface* asset,* surface;
+
+	asset = IMG_Load("assets/obstacle.png");
+	int w = rectangle.w, h = rectangle.h;
+
+	Uint32 rmask, gmask, bmask;
+	rmask = 0xff000000;
+	gmask = 0x00ff0000;
+	bmask = 0x0000ff00;
+
+	surface = SDL_CreateRGBSurface(0, w, h, 32, rmask,gmask,bmask, SDL_ALPHA_OPAQUE);
+	
+	Uint32 color = SDL_MapRGB(surface->format, 88, 47, 14);
+	SDL_FillRect(surface, NULL, color);
+	
+	SDL_Rect destRect;
+	destRect.x = destRect.y = 10;
+	destRect.w = w - 20;
+	destRect.h = h - 20;
+
+	SDL_BlitScaled(asset, NULL, surface, &destRect);
+
+	return surface;
 }
