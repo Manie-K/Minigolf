@@ -13,6 +13,7 @@ void ballBoxModelUpdate(Ball& ball);
 bool checkWin(Ball& ball, Hole hole);
 void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int length);
 void visualiseShot(Ball ball, SDL_Renderer* renderer);
+void drawArrow(SDL_Renderer* renderer, SDL_Rect rect, double angle);
 void drawBackground(SDL_Renderer* renderer);
 
 int gameStart(SDL_Variables&SDLvariables, Ball& ball, Hole& hole, Level& level);

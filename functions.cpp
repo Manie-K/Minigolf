@@ -259,10 +259,27 @@ void visualiseShot(Ball ball, SDL_Renderer* renderer)
 		dX = int(length * cos);
 		dY = int(length * sin);
 	}
+	double angle;
+	angle = asin(sin);
 
-	drawLine(renderer, x, y, x-dX, y - dY, (int)length);
+	angle = angle * 180.0 / M_PI;
+	angle -= 90;
+	angle *= dX >= 0 ? 1 : -1;
+
+	const int arrowWidth = 30;
+	const int minimumArrowLength = 24;
+
+	double arrowLength = length < minimumArrowLength ? 0 : length;
+	SDL_Rect temp = {x-arrowWidth/2,y-arrowLength, arrowWidth, arrowLength};
+	
+	drawArrow(renderer, temp, angle);
 }
-
+void drawArrow(SDL_Renderer* renderer, SDL_Rect rect, double angle) {
+	SDL_Surface* temp = IMG_Load("assets/arrow.png");
+	SDL_Point p = { rect.w/2, rect.h };
+	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, temp);
+	SDL_RenderCopyEx(renderer, texture, NULL, &rect,angle,&p, SDL_FLIP_NONE);
+}
 void drawBackground(SDL_Renderer* renderer) {
 	const unsigned short int h = 50;
 	SDL_Surface* grassSurface = IMG_Load("assets/grass.png");
