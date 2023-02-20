@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
 	Player player = { 0,0,0 };
 	bool gameRunning = true;
 
+	//game initial configuration
 	if (gameStart(SDLvariables, ball, hole, level,text,menu) < 0) return -1;
 	
 	while (gameRunning)
@@ -23,7 +24,7 @@ int main(int argc, char* argv[])
 		timeVariables.frameStart = SDL_GetTicks();
 		
 		//update ball
-		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer,menu);
+		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer,menu,gameRunning);
 		
 		//handle event
 		gameHandleEvents(ball, gameRunning,player,text,SDLvariables.renderer);
@@ -34,10 +35,10 @@ int main(int argc, char* argv[])
 		//update time
 		timeVariables.frameTime = SDL_GetTicks() - timeVariables.frameStart;
 	}
+	//end menu
+	finishGame(SDLvariables.renderer,player);
 
-	SDL_DestroyWindow(SDLvariables.window);
-	SDL_DestroyRenderer(SDLvariables.renderer);
-	TTF_Quit();
-	SDL_Quit();
+	//cleaning memory
+	gameCleanUp(SDLvariables);
 	return 0;
 }

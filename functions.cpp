@@ -1,6 +1,5 @@
 #include "functions.h"
 #include <iostream>
-#include <string>
 #include <fstream>
 
 using namespace std;
@@ -386,7 +385,8 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContain
 		}
 	}
 }
-void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer& text, SDL_Renderer* renderer, Menu& menu)
+void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer& text, 
+	SDL_Renderer* renderer, Menu& menu, bool& gameRunning)
 {
 	//ball update
 	ballPositionUpdate(ball, frameTime);
@@ -401,21 +401,25 @@ void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& 
 
 	//checks win
 	if (checkWin(ball, hole)) {
-		win(renderer, level, player, text, ball, hole, menu);
+		win(renderer, level, player, text, ball, hole, menu, gameRunning);
 	}
 }
-void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& text, Ball& ball, Hole& hole, Menu& menu) 
+void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& text, Ball& ball, Hole& hole, Menu& menu, bool& gameRunning) 
 {
 	int tempScore;
 	calculatePlayerScore(tempScore, player, level);
 	//show menu
 	showNextLevelMenu(renderer, menu,player,tempScore);
 	//load next level
-	goToNextLevel(renderer, text, ball, hole, level, player);
+	if (goToNextLevel(renderer, text, ball, hole, level, player)) {
+		//finish game
+		gameRunning = false;
+	}
 }
-void goToNextLevel(SDL_Renderer* renderer, TextContainer& text, Ball& ball, Hole& hole, Level& level, Player& player)
+bool goToNextLevel(SDL_Renderer* renderer, TextContainer& text, Ball& ball, Hole& hole, Level& level, Player& player)
 {
 	level.levelID++;
+	if (level.levelID > LEVELS) return true;
 	//text updates
 	string lvl;
 	if (level.levelID >= 10) {
@@ -436,6 +440,7 @@ void goToNextLevel(SDL_Renderer* renderer, TextContainer& text, Ball& ball, Hole
 	loadLevel(level);
 	ballSet(ball, level);
 	holeSetPosition(hole, level);
+	return false;
 }
 void calculatePlayerScore(int& tempScore, Player& player, Level level)
 {
@@ -487,48 +492,31 @@ void renderMenuText(SDL_Renderer* renderer, Player& player, int tempScore) {
 	const int size = 50;
 	SDL_Color color = { 255, 255, 255 };
 	string message;
-	SDL_Surface* temp;
 	SDL_Texture* texture;
 	SDL_Rect rect = { 0,0,size,size };
 	//Score
 	message = to_string(tempScore);
-	temp = TTF_RenderText_Solid(font, message.c_str(), color);
-	texture = SDL_CreateTextureFromSurface(renderer, temp);
-	rect.x = 450;
-	rect.y = 260;
-	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	renderText(renderer, texture, message, rect, 450, 260, font, color);
 
 	//Total Score
 	message = to_string(player.score);
-	temp = TTF_RenderText_Solid(font, message.c_str(), color);
-	texture = SDL_CreateTextureFromSurface(renderer, temp);
-	rect.x = 350;
-	rect.y = 438;
-	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	renderText(renderer, texture, message, rect, 350, 438, font, color);
 
 	//Total shots
 	if (player.shotsTotal < 10)
 		message = '0' + to_string(player.shotsTotal);
 	else
 		message = to_string(player.shotsTotal);
-	temp = TTF_RenderText_Solid(font, message.c_str(), color);
-	texture = SDL_CreateTextureFromSurface(renderer, temp);
-	rect.x = 350;
-	rect.y = 555;
-	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	renderText(renderer, texture, message, rect, 350, 555, font, color);
+
 	//Shots
 	if (player.shotsPerLevel < 10)
 		message = '0' + to_string(player.shotsPerLevel);
 	else
 		message = to_string(player.shotsPerLevel);
-	temp = TTF_RenderText_Solid(font, message.c_str(), color);
-	texture = SDL_CreateTextureFromSurface(renderer, temp);
-	rect.x = 450;
-	rect.y = 320;
-	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	renderText(renderer, texture, message, rect, 450, 320, font, color);
 
 	TTF_CloseFont(font);
-	SDL_FreeSurface(temp);
 	SDL_DestroyTexture(texture);
 }
 
@@ -680,4 +668,53 @@ void drawLevelText(Level level, SDL_Renderer* renderer, TextContainer text) {
 	SDL_RenderCopy(renderer, text.levelNum.texture, NULL, &text.levelNum.rect);
 	SDL_RenderCopy(renderer, text.scoreNum.texture, NULL, &text.scoreNum.rect);
 	SDL_RenderCopy(renderer, text.shotsNum.texture, NULL, &text.shotsNum.rect);
+}
+
+void gameCleanUp(SDL_Variables& SDLvariables) {
+	SDL_DestroyWindow(SDLvariables.window);
+	SDL_DestroyRenderer(SDLvariables.renderer);
+	TTF_Quit();
+	SDL_Quit();
+}
+void renderText(SDL_Renderer* renderer, SDL_Texture*& texture, string message, SDL_Rect& rect,int x, int y, TTF_Font* font, SDL_Color color) 
+{
+	SDL_Surface* temp;
+	temp = TTF_RenderText_Solid(font, message.c_str(), color);
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	rect.x = x;
+	rect.y = y;
+	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	SDL_FreeSurface(temp);
+}
+void finishGame(SDL_Renderer* renderer, Player player)
+{
+	TTF_Font* font = TTF_OpenFont("assets/font.ttf", 24);
+	const int size = 50;
+	SDL_Color color = { 97, 39, 39 };
+	string message;
+	SDL_Texture* texture;
+	SDL_Rect rect = { 0,0,size,size };
+
+	SDL_Surface* temp = IMG_Load("assets/finish.png");
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	SDL_FreeSurface(temp);
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
+	
+	message = to_string(player.score);
+	renderText(renderer, texture, message, rect, 460, 215, font, color);
+
+	message = to_string(player.shotsTotal);
+	renderText(renderer, texture, message, rect, 460, 300, font, color);
+
+	SDL_RenderPresent(renderer);
+
+	bool spacePressed = false;
+	while (!spacePressed) {
+		SDL_Event e;
+		while (SDL_PollEvent(&e))
+			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_SPACE||e.key.keysym.sym == SDLK_ESCAPE)))
+				spacePressed = true;
+	}
+	SDL_Delay(250);
+	SDL_DestroyTexture(texture);
 }

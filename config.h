@@ -12,6 +12,8 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 700
 
+#define LEVELS 0
+
 struct SDL_Variables {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
