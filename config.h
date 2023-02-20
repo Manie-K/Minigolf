@@ -4,15 +4,15 @@
 #include <SDL_ttf.h>
 #include <vector>
 
-#define BALL_FRICTION 0.005
-#define MAX_POWER 150
-#define MAX_HOLE_SPEED 1
-#define MINIMUM_WIN_AREA_COLLISION 0.25
+#define BALL_FRICTION 0.006
+#define MAX_POWER 130
+#define MAX_HOLE_SPEED 1.1
+#define MINIMUM_WIN_AREA_COLLISION 10
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 700
 
-#define LEVELS 0
+#define LEVELS 8
 
 struct SDL_Variables {
 	SDL_Window* window;

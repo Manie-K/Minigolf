@@ -259,18 +259,16 @@ void shootBall(Ball& ball, Player &player, TextContainer&text,SDL_Renderer* rend
 	if (player.shotsPerLevel < 10)shotCount = "0" + to_string(player.shotsPerLevel);
 	updateText(renderer, 2, shotCount.c_str(), text);
 }
-bool checkWin(Ball& ball, Hole hole) {
+bool checkWin(Ball& ball, Hole hole) 
+{
 	if (abs(ball.Xspeed) > MAX_HOLE_SPEED || abs(ball.Yspeed )> MAX_HOLE_SPEED) return false;
-	SDL_Rect temp = { 0,0,0,0 };
-	bool x = SDL_IntersectRect(&ball.boxModel, &hole.boxModel, &temp);
-	double area = temp.w * temp.h;
-	if (x&&area >= ball.size * ball.size * MINIMUM_WIN_AREA_COLLISION) {
-		ball.x = hole.x;
-		ball.y = hole.y;
-		ballBoxModelUpdate(ball);
-		ball.isMoving = false;
+	
+	int x1 = ball.x, y1=ball.y, x2=hole.x, y2=hole.y;
+	int dx = x1 - x2, dy = y1 - y2;
+	double distance = sqrt(dx*dx+dy*dy);
+
+	if (abs(distance) < MINIMUM_WIN_AREA_COLLISION)
 		return true;
-	}
 	return false;
 }
 
@@ -316,6 +314,8 @@ void drawArrow(SDL_Renderer* renderer, SDL_Rect rect, double angle) {
 	SDL_Point p = { rect.w/2, rect.h };
 	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, temp);
 	SDL_RenderCopyEx(renderer, texture, NULL, &rect,angle,&p, SDL_FLIP_NONE);
+	SDL_FreeSurface(temp);
+	SDL_DestroyTexture(texture);
 }
 void drawBackground(SDL_Renderer* renderer) {
 	const unsigned short int h = 50;
@@ -445,10 +445,9 @@ bool goToNextLevel(SDL_Renderer* renderer, TextContainer& text, Ball& ball, Hole
 void calculatePlayerScore(int& tempScore, Player& player, Level level)
 {
 	tempScore = level.levelScore;
-	int penalty = (player.shotsPerLevel - level.levelFreeShots);
-	penalty = penalty <= 0 ? 0 : penalty * 100;
-	tempScore -= penalty;
-	player.score += tempScore > 0 ? tempScore : 100;
+	int penalty = (player.shotsPerLevel - level.levelFreeShots) * 50;
+	tempScore = max(tempScore - penalty, 100);
+	player.score += tempScore;
 }
 void showNextLevelMenu(SDL_Renderer* renderer,Menu& menu, Player& player, int tempScore) 
 {
@@ -457,7 +456,12 @@ void showNextLevelMenu(SDL_Renderer* renderer,Menu& menu, Player& player, int te
 	SDL_RenderCopy(renderer, menu.menuTexture, NULL, NULL);
 	
 	//calculate stars
-	int numOfStars = 3;
+	int numOfStars = 0;
+	if (tempScore < 150)
+		numOfStars = 1;
+	else if (tempScore < 400)
+		numOfStars = 2;
+	else numOfStars = 3;
 	
 	//render stars
 	renderStars(renderer, menu, numOfStars);
