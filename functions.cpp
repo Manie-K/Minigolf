@@ -96,6 +96,16 @@ void initText(SDL_Renderer* renderer, TextContainer& text)
 	text.scoreNum.rect = { text.staticText.score.rect.x + text.staticText.score.rect.w, text.staticText.score.rect.y, 34, 34 };
 	SDL_FreeSurface(temp);
 }
+void initMenu(SDL_Renderer* renderer, Menu& menu) 
+{
+	SDL_Surface* tempSurf = IMG_Load("assets/menu.png");
+	menu.menuTexture = SDL_CreateTextureFromSurface(renderer, tempSurf);
+	SDL_FreeSurface(tempSurf);
+	tempSurf = IMG_Load("assets/star.png");
+	menu.star.texture = SDL_CreateTextureFromSurface(renderer, tempSurf);
+	SDL_FreeSurface(tempSurf);
+	menu.star.rect.w = menu.star.rect.h = 100;
+}
 void holeSetPosition(Hole& hole, Level level) {
 	hole.x = level.holePos.x;
 	hole.y = level.holePos.y;
@@ -312,7 +322,7 @@ void drawBackground(SDL_Renderer* renderer) {
 	const unsigned short int h = 50;
 	SDL_Surface* grassSurface = IMG_Load("assets/grass.png");
 	SDL_Texture* temp = SDL_CreateTextureFromSurface(renderer, grassSurface);
-
+	SDL_FreeSurface(grassSurface);
 	SDL_Rect rect = {0,0,h,h};
 	int y = 0;
 	int x = 0;
@@ -326,10 +336,10 @@ void drawBackground(SDL_Renderer* renderer) {
 		}
 		y += h;
 	}
-	SDL_FreeSurface(grassSurface);
+	SDL_DestroyTexture(temp);
 }
 
-int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level, TextContainer &text)
+int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level, TextContainer &text, Menu& menu)
 {
 	if (initSDL(SDLvariables) < 0) return -1;
 	if (TTF_Init()<0) return -1;
@@ -337,18 +347,20 @@ int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level,
 	if (initBall(SDLvariables, ball, level) < 0) return -1;
 	if (initHole(hole, SDLvariables, level) < 0) return -1;
 	initText(SDLvariables.renderer, text);
+	initMenu(SDLvariables.renderer, menu);
 	return 1;
 }
-//MEMORY LEAK------------------------------------
 void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level, TextContainer text) 
 {
 	SDL_SetRenderDrawColor(SDLvariables.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(SDLvariables.renderer);
+	//POSSIBLE MEMORY LEAK------------------------------------
 	drawBackground(SDLvariables.renderer);											//draws backgorund
 	drawObstacles(SDLvariables.renderer, level);									//draws obstacles
+	//--------------------------------------------------------
 	SDL_RenderCopy(SDLvariables.renderer, hole.holeTexture, NULL, &hole.drawModel); //draws hole
 	SDL_RenderCopy(SDLvariables.renderer, ball.ballTexture, NULL, &ball.boxModel);  //draws ball
-	drawLevelText(level,SDLvariables.renderer, text);						//draw text
+	drawLevelText(level,SDLvariables.renderer, text);								//draw text
 	if (ball.drawArrow)
 		visualiseShot(ball, SDLvariables.renderer);									//draws arrow when shooting
 	SDL_RenderPresent(SDLvariables.renderer);
@@ -374,7 +386,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContain
 		}
 	}
 }
-void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer&text,SDL_Renderer* renderer)
+void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer& text, SDL_Renderer* renderer, Menu& menu)
 {
 	//ball update
 	ballPositionUpdate(ball, frameTime);
@@ -388,19 +400,23 @@ void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& 
 	obstaclesCollision(ball, level);
 
 	//checks win
-	if (checkWin(ball, hole))
-		win(renderer,level, player,text,ball,hole);
+	if (checkWin(ball, hole)) {
+		win(renderer, level, player, text, ball, hole, menu);
+	}
 }
-void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& text, Ball& ball, Hole& hole) {
-	int tempScore = level.levelScore;
-	int penalty = (player.shotsPerLevel - level.levelFreeShots);
-	penalty = penalty <= 0 ? 0 : penalty * 100;
-	tempScore -= penalty;
-	player.score += tempScore > 0 ? tempScore : 100;
-	player.shotsPerLevel = 0;
-
+void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& text, Ball& ball, Hole& hole, Menu& menu) 
+{
+	int tempScore;
+	calculatePlayerScore(tempScore, player, level);
+	//show menu
+	showNextLevelMenu(renderer, menu,player,tempScore);
 	//load next level
+	goToNextLevel(renderer, text, ball, hole, level, player);
+}
+void goToNextLevel(SDL_Renderer* renderer, TextContainer& text, Ball& ball, Hole& hole, Level& level, Player& player)
+{
 	level.levelID++;
+	//text updates
 	string lvl;
 	if (level.levelID >= 10) {
 		lvl = to_string(level.levelID);
@@ -413,17 +429,117 @@ void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& te
 	updateText(renderer, 0, lvl.c_str(), text);
 	updateText(renderer, 1, scr.c_str(), text);
 	updateText(renderer, 2, "00", text);
+	
+	//other setups
+	player.shotsPerLevel = 0;
 	level.obstacles.clear();
 	loadLevel(level);
 	ballSet(ball, level);
 	holeSetPosition(hole, level);
 }
+void calculatePlayerScore(int& tempScore, Player& player, Level level)
+{
+	tempScore = level.levelScore;
+	int penalty = (player.shotsPerLevel - level.levelFreeShots);
+	penalty = penalty <= 0 ? 0 : penalty * 100;
+	tempScore -= penalty;
+	player.score += tempScore > 0 ? tempScore : 100;
+}
+void showNextLevelMenu(SDL_Renderer* renderer,Menu& menu, Player& player, int tempScore) 
+{
+	SDL_Delay(500);
+	//render background
+	SDL_RenderCopy(renderer, menu.menuTexture, NULL, NULL);
+	
+	//calculate stars
+	int numOfStars = 3;
+	
+	//render stars
+	renderStars(renderer, menu, numOfStars);
+	
+	//render text
+	renderMenuText(renderer, player, tempScore);
+
+	SDL_RenderPresent(renderer);
+	bool spacePressed = false;
+	while (!spacePressed) {
+		SDL_Event e;
+		while (SDL_PollEvent(&e))
+			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_SPACE))
+				spacePressed = true;
+	}
+	SDL_Delay(250);
+}
+void renderStars(SDL_Renderer* renderer, Menu& menu, const int numOfStars) 
+{
+	SDL_Rect rect;
+	rect.y = 120;
+	rect.w = menu.star.rect.h;
+	rect.h = rect.w + 10;
+	for (int i = 0; i < numOfStars; i++)
+	{
+		rect.x = 249 + i * rect.w;
+		SDL_RenderCopy(renderer, menu.star.texture, NULL, &rect);
+	}
+}
+void renderMenuText(SDL_Renderer* renderer, Player& player, int tempScore) {
+	TTF_Font* font = TTF_OpenFont("assets/font.ttf", 24);
+	const int size = 50;
+	SDL_Color color = { 255, 255, 255 };
+	string message;
+	SDL_Surface* temp;
+	SDL_Texture* texture;
+	SDL_Rect rect = { 0,0,size,size };
+	//Score
+	message = to_string(tempScore);
+	temp = TTF_RenderText_Solid(font, message.c_str(), color);
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	rect.x = 450;
+	rect.y = 260;
+	SDL_RenderCopy(renderer, texture, NULL, &rect);
+
+	//Total Score
+	message = to_string(player.score);
+	temp = TTF_RenderText_Solid(font, message.c_str(), color);
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	rect.x = 350;
+	rect.y = 438;
+	SDL_RenderCopy(renderer, texture, NULL, &rect);
+
+	//Total shots
+	if (player.shotsTotal < 10)
+		message = '0' + to_string(player.shotsTotal);
+	else
+		message = to_string(player.shotsTotal);
+	temp = TTF_RenderText_Solid(font, message.c_str(), color);
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	rect.x = 350;
+	rect.y = 555;
+	SDL_RenderCopy(renderer, texture, NULL, &rect);
+	//Shots
+	if (player.shotsPerLevel < 10)
+		message = '0' + to_string(player.shotsPerLevel);
+	else
+		message = to_string(player.shotsPerLevel);
+	temp = TTF_RenderText_Solid(font, message.c_str(), color);
+	texture = SDL_CreateTextureFromSurface(renderer, temp);
+	rect.x = 450;
+	rect.y = 320;
+	SDL_RenderCopy(renderer, texture, NULL, &rect);
+
+	TTF_CloseFont(font);
+	SDL_FreeSurface(temp);
+	SDL_DestroyTexture(texture);
+}
+
 void drawObstacles(SDL_Renderer* renderer, Level level) 
 {
 	for (SDL_Rect obstacle : level.obstacles) {
 		SDL_Surface* tempSurf = getObstacleSurface(obstacle);
 		SDL_Texture* temp = SDL_CreateTextureFromSurface(renderer, tempSurf);
 		SDL_RenderCopy(renderer, temp, NULL, &obstacle);
+		SDL_FreeSurface(tempSurf);
+		SDL_DestroyTexture(temp);
 	}
 }
 void obstaclesCollision(Ball& ball, Level level) 

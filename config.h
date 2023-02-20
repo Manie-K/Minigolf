@@ -73,3 +73,11 @@ struct TextContainer {
 	}staticText;
 	Text levelNum, scoreNum, shotsNum;
 };
+
+struct Menu {
+	SDL_Texture* menuTexture;
+	struct {
+		SDL_Texture* texture;
+		SDL_Rect rect;
+	}star;
+};

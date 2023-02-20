@@ -11,18 +11,19 @@ int main(int argc, char* argv[])
 	Ball ball;
 	Hole hole;
 	TextContainer text;
+	Menu menu;
 	Level level = { 1 };
 	Player player = { 0,0,0 };
 	bool gameRunning = true;
 
-	if (gameStart(SDLvariables, ball, hole, level,text) < 0) return -1;
+	if (gameStart(SDLvariables, ball, hole, level,text,menu) < 0) return -1;
 	
 	while (gameRunning)
 	{
 		timeVariables.frameStart = SDL_GetTicks();
 		
 		//update ball
-		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer);
+		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer,menu);
 		
 		//handle event
 		gameHandleEvents(ball, gameRunning,player,text,SDLvariables.renderer);
