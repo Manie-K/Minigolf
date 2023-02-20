@@ -62,6 +62,40 @@ int initHole(Hole& hole, SDL_Variables vars, Level& level)
 	SDL_FreeSurface(tempSurface);
 	return 0;
 }
+void initText(SDL_Renderer* renderer, TextContainer& text) 
+{
+	text.font = TTF_OpenFont("assets/font.ttf", 24);
+
+	SDL_Color color = { 255, 255, 255 };
+	int w=0, h=0;
+
+	//score
+	TTF_SizeUTF8(text.font, "SCORE: ", &w, &h);
+	SDL_Surface* temp = TTF_RenderText_Solid(text.font, "SCORE: ", color);
+	text.staticText.score.texture = SDL_CreateTextureFromSurface(renderer, temp);
+	text.staticText.score.rect = { 50,0,w,h };
+	//shots
+	TTF_SizeUTF8(text.font, "SHOTS: ", &w, &h);
+	temp = TTF_RenderText_Solid(text.font, "SHOTS: ", color);
+	text.staticText.shots.texture = SDL_CreateTextureFromSurface(renderer, temp);
+	text.staticText.shots.rect = { SCREEN_WIDTH-2*w,0,w,h };
+	SDL_FreeSurface(temp);
+	//level
+	TTF_SizeUTF8(text.font, "LEVEL: ", &w, &h);
+	temp = TTF_RenderText_Solid(text.font, "LEVEL: ", color);
+	text.staticText.level.texture = SDL_CreateTextureFromSurface(renderer, temp);
+	text.staticText.level.rect = { SCREEN_WIDTH/2-w/2,SCREEN_HEIGHT-2*h,w,h };
+
+
+	TTF_CloseFont(text.font);
+	updateText(renderer, 0, "01", text);
+	updateText(renderer, 1, "00", text);
+	updateText(renderer, 2, "00", text);
+	text.levelNum.rect = { text.staticText.level.rect.x + text.staticText.level.rect.w, text.staticText.level.rect.y, 34, 34 };
+	text.shotsNum.rect = { text.staticText.shots.rect.x + text.staticText.shots.rect.w , text.staticText.shots.rect.y, 34, 34 };
+	text.scoreNum.rect = { text.staticText.score.rect.x + text.staticText.score.rect.w, text.staticText.score.rect.y, 34, 34 };
+	SDL_FreeSurface(temp);
+}
 void holeSetPosition(Hole& hole, Level level) {
 	hole.x = level.holePos.x;
 	hole.y = level.holePos.y;
@@ -140,6 +174,28 @@ void ballBoxModelUpdate(Ball& ball) {
 	ball.boxModel = tempModel;
 }
 
+void updateText(SDL_Renderer* renderer,int type, const char* message, TextContainer& text)
+{
+	text.font = TTF_OpenFont("assets/font.ttf", 24);
+	SDL_Color color = { 255, 255, 255 };
+	SDL_Surface* temp = TTF_RenderText_Solid(text.font, message, color);
+	switch (type)
+	{
+	case 0:
+		text.levelNum.texture = SDL_CreateTextureFromSurface(renderer, temp);
+		break;
+	case 1:
+		text.scoreNum.texture = SDL_CreateTextureFromSurface(renderer, temp);
+		break;
+	case 2:
+		text.shotsNum.texture = SDL_CreateTextureFromSurface(renderer, temp);
+		break;
+	default:
+		break;
+	}
+	TTF_CloseFont(text.font);
+	SDL_FreeSurface(temp);
+}
 void calculateCollisions(Ball& ball)
 {
 	if (ball.x <= ball.radius){
@@ -160,13 +216,11 @@ void calculateCollisions(Ball& ball)
 	}
 }
 
-void shootBall(Ball& ball, Player &player){
-	double power;
-	double cos, sin;
+void shootBall(Ball& ball, Player &player, TextContainer&text,SDL_Renderer* renderer)
+{	
+	double power, cos, sin;
 	const double powerScale = 0.01;
-	int mouseX, mouseY;
-	int x, y;
-	int dX, dY;
+	int mouseX, mouseY, x, y, dX, dY;
 
 	x = ball.x;
 	y = ball.y;
@@ -191,8 +245,11 @@ void shootBall(Ball& ball, Player &player){
 	ball.drawArrow = false;
 	player.shotsTotal++;
 	player.shotsPerLevel++;
-}
 
+	string shotCount = to_string(player.shotsPerLevel);
+	if (player.shotsPerLevel < 10)shotCount = "0" + to_string(player.shotsPerLevel);
+	updateText(renderer, 2, shotCount.c_str(), text);
+}
 bool checkWin(Ball& ball, Hole hole) {
 	if (abs(ball.Xspeed) > MAX_HOLE_SPEED || abs(ball.Yspeed )> MAX_HOLE_SPEED) return false;
 	SDL_Rect temp = { 0,0,0,0 };
@@ -208,38 +265,9 @@ bool checkWin(Ball& ball, Hole hole) {
 	return false;
 }
 
-void drawLine(SDL_Renderer* renderer, int x1, int y1, int x2, int y2, int length) 
-{
-	SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
-	
-	double angle = atan2(y2 - y1, x2 - x1);
-
-	// Calculate the endpoints of the arrowhead
-	int arrowLength = 10;
-	int arrowWidth = 5;
-	if (length > 100) {
-		arrowLength *= 3;
-		arrowWidth *= 3;
-	}
-	else if (length > 50) {
-		arrowLength *= 2;
-		arrowWidth *= 2;
-	}
-	int arrowX1 = int(x2 - arrowLength * cos(angle) + arrowWidth * sin(angle));
-	int arrowY1 = int(y2 - arrowLength * sin(angle) - arrowWidth * cos(angle));
-	int arrowX2 = int(x2 - arrowLength * cos(angle) - arrowWidth * sin(angle));
-	int arrowY2 = int(y2 - arrowLength * sin(angle) + arrowWidth * cos(angle));
-
-	// Draw the line and arrowhead
-	SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
-	SDL_RenderDrawLine(renderer, x2, y2, arrowX1, arrowY1);
-	SDL_RenderDrawLine(renderer, x2, y2, arrowX2, arrowY2);
-}
 void visualiseShot(Ball ball, SDL_Renderer* renderer)
 {
-	int mouseX, mouseY;
-	int x, y;
-	int dX, dY;
+	int mouseX, mouseY, x, y, dX, dY;
 
 	x = ball.x;
 	y = ball.y;
@@ -301,15 +329,18 @@ void drawBackground(SDL_Renderer* renderer) {
 	SDL_FreeSurface(grassSurface);
 }
 
-int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level)
+int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level, TextContainer &text)
 {
 	if (initSDL(SDLvariables) < 0) return -1;
+	if (TTF_Init()<0) return -1;
 	loadLevel(level);
 	if (initBall(SDLvariables, ball, level) < 0) return -1;
 	if (initHole(hole, SDLvariables, level) < 0) return -1;
+	initText(SDLvariables.renderer, text);
 	return 1;
 }
-void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level)
+//MEMORY LEAK------------------------------------
+void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level, TextContainer text) 
 {
 	SDL_SetRenderDrawColor(SDLvariables.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(SDLvariables.renderer);
@@ -317,11 +348,12 @@ void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level
 	drawObstacles(SDLvariables.renderer, level);									//draws obstacles
 	SDL_RenderCopy(SDLvariables.renderer, hole.holeTexture, NULL, &hole.drawModel); //draws hole
 	SDL_RenderCopy(SDLvariables.renderer, ball.ballTexture, NULL, &ball.boxModel);  //draws ball
+	drawLevelText(level,SDLvariables.renderer, text);						//draw text
 	if (ball.drawArrow)
 		visualiseShot(ball, SDLvariables.renderer);									//draws arrow when shooting
 	SDL_RenderPresent(SDLvariables.renderer);
 }
-void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player)
+void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContainer& text, SDL_Renderer* renderer)
 {
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
@@ -332,7 +364,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player)
 			break;
 		case SDL_MOUSEBUTTONUP:
 			if (event.button.button == SDL_BUTTON_LEFT && ball.isMoving == false) {
-				shootBall(ball,player);
+				shootBall(ball,player,text,renderer);
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -342,7 +374,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player)
 		}
 	}
 }
-void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player)
+void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer&text,SDL_Renderer* renderer)
 {
 	//ball update
 	ballPositionUpdate(ball, frameTime);
@@ -356,21 +388,36 @@ void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& 
 	obstaclesCollision(ball, level);
 
 	//checks win
-	if (checkWin(ball, hole)) {
-		//update player
-		int tempScore = level.levelScore - (player.shotsPerLevel - level.levelFreeShots) * 100;
-		player.score += tempScore > 0 ? tempScore : 0;
-		player.shotsPerLevel = 0;
-
-		//load next level
-		level.levelID++;
-		level.obstacles.clear();
-		loadLevel(level);
-		ballSet(ball, level);
-		holeSetPosition(hole, level);
-	}
+	if (checkWin(ball, hole))
+		win(renderer,level, player,text,ball,hole);
 }
+void win(SDL_Renderer* renderer, Level& level, Player& player, TextContainer& text, Ball& ball, Hole& hole) {
+	int tempScore = level.levelScore;
+	int penalty = (player.shotsPerLevel - level.levelFreeShots);
+	penalty = penalty <= 0 ? 0 : penalty * 100;
+	tempScore -= penalty;
+	player.score += tempScore > 0 ? tempScore : 100;
+	player.shotsPerLevel = 0;
 
+	//load next level
+	level.levelID++;
+	string lvl;
+	if (level.levelID >= 10) {
+		lvl = to_string(level.levelID);
+	}
+	else {
+		lvl = "0" + to_string(level.levelID);
+	}
+	string scr = to_string(player.score);
+
+	updateText(renderer, 0, lvl.c_str(), text);
+	updateText(renderer, 1, scr.c_str(), text);
+	updateText(renderer, 2, "00", text);
+	level.obstacles.clear();
+	loadLevel(level);
+	ballSet(ball, level);
+	holeSetPosition(hole, level);
+}
 void drawObstacles(SDL_Renderer* renderer, Level level) 
 {
 	for (SDL_Rect obstacle : level.obstacles) {
@@ -485,7 +532,6 @@ void loadLevel(Level& level) {
 	file.close();
 }
 
-
 SDL_Surface* getObstacleSurface(SDL_Rect rectangle) {
 	SDL_Surface* asset,* surface;
 
@@ -508,6 +554,14 @@ SDL_Surface* getObstacleSurface(SDL_Rect rectangle) {
 	destRect.h = h - 20;
 
 	SDL_BlitScaled(asset, NULL, surface, &destRect);
-
+	SDL_FreeSurface(asset);
 	return surface;
+}
+void drawLevelText(Level level, SDL_Renderer* renderer, TextContainer text) {
+	SDL_RenderCopy(renderer, text.staticText.level.texture, NULL, &text.staticText.level.rect);
+	SDL_RenderCopy(renderer, text.staticText.score.texture, NULL, &text.staticText.score.rect);
+	SDL_RenderCopy(renderer, text.staticText.shots.texture, NULL, &text.staticText.shots.rect);
+	SDL_RenderCopy(renderer, text.levelNum.texture, NULL, &text.levelNum.rect);
+	SDL_RenderCopy(renderer, text.scoreNum.texture, NULL, &text.scoreNum.rect);
+	SDL_RenderCopy(renderer, text.shotsNum.texture, NULL, &text.shotsNum.rect);
 }

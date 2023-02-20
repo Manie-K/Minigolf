@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <vector>
 
 #define BALL_FRICTION 0.005
@@ -58,4 +59,17 @@ struct Player {
 	int score;
 	int shotsTotal;
 	int shotsPerLevel;
+};
+
+struct Text {
+	SDL_Texture* texture;
+	SDL_Rect rect;
+};
+
+struct TextContainer {
+	TTF_Font* font;
+	struct{
+		Text level, shots, score;
+	}staticText;
+	Text levelNum, scoreNum, shotsNum;
 };
