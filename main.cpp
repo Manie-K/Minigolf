@@ -10,6 +10,7 @@ int main(int argc, char* argv[])
 	Time_Variables timeVariables = {0,0};
 	Ball ball;
 	Hole hole;
+	Sounds sounds;
 	TextContainer text;
 	Menu menu;
 	Level level = { 1 };
@@ -17,17 +18,17 @@ int main(int argc, char* argv[])
 	bool gameRunning = true;
 
 	//game initial configuration
-	if (gameStart(SDLvariables, ball, hole, level,text,menu) < 0) return -1;
+	if (gameStart(SDLvariables, ball, hole, level,text,menu,sounds) < 0) return -1;
 	
 	while (gameRunning)
 	{
 		timeVariables.frameStart = SDL_GetTicks();
 		
 		//update ball
-		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer,menu,gameRunning);
+		gameUpdate(ball,timeVariables.frameTime, hole,level, player,text,SDLvariables.renderer,menu,gameRunning,sounds);
 		
 		//handle event
-		gameHandleEvents(ball, gameRunning,player,text,SDLvariables.renderer);
+		gameHandleEvents(ball, gameRunning,player,text,SDLvariables.renderer,sounds);
 
 		//render
 		gameRender(SDLvariables, ball, hole,level,text);
@@ -39,6 +40,6 @@ int main(int argc, char* argv[])
 	finishGame(SDLvariables.renderer,player);
 
 	//cleaning memory
-	gameCleanUp(SDLvariables);
+	gameCleanUp(SDLvariables, sounds);
 	return 0;
 }

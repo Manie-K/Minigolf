@@ -5,7 +5,7 @@
 using namespace std;
 
 int initSDL(SDL_Variables& vars) {
-	if (SDL_Init(SDL_INIT_VIDEO)) {
+	if (SDL_Init(SDL_INIT_EVERYTHING)) {
 		cout << "Error while initializing SDL: " << SDL_GetError() << "\n";
 		return -1;
 	}
@@ -205,28 +205,38 @@ void updateText(SDL_Renderer* renderer,int type, const char* message, TextContai
 	TTF_CloseFont(text.font);
 	SDL_FreeSurface(temp);
 }
-void calculateCollisions(Ball& ball)
+void calculateCollisions(Ball& ball,Sounds sounds)
 {
+	bool coll = false;
 	if (ball.x <= ball.radius){
 		ball.x = ball.size;
 		ball.Xspeed *= -1;
+		coll = true;
 	}
 	else if (abs(SCREEN_WIDTH - ball.x) <= ball.radius) {
 		ball.x = SCREEN_WIDTH-ball.size;
 		ball.Xspeed *= -1;
+		coll = true;
 	}
 	if (ball.y <= ball.radius){
 		ball.y = ball.size;
 		ball.Yspeed *= -1;
+		coll = true;
 	}
 	else if (abs(SCREEN_HEIGHT - ball.y) <= ball.radius) {
 		ball.y = SCREEN_HEIGHT - ball.size;
 		ball.Yspeed *= -1;
+		coll = true;
 	}
+	if (coll)
+		Mix_PlayChannel(-1, sounds.collision, 0);
 }
 
-void shootBall(Ball& ball, Player &player, TextContainer&text,SDL_Renderer* renderer)
+void shootBall(Ball& ball, Player &player, TextContainer&text,SDL_Renderer* renderer, Sounds& sounds)
 {	
+	//play sound
+	Mix_PlayChannel(-1, sounds.shot, 0);
+
 	double power, cos, sin;
 	const double powerScale = 0.01;
 	int mouseX, mouseY, x, y, dX, dY;
@@ -338,9 +348,11 @@ void drawBackground(SDL_Renderer* renderer) {
 	SDL_DestroyTexture(temp);
 }
 
-int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level, TextContainer &text, Menu& menu)
+int gameStart(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level& level, TextContainer &text, Menu& menu, Sounds &sounds)
 {
 	if (initSDL(SDLvariables) < 0) return -1;
+	if (Mix_OpenAudio(22050, MIX_DEFAULT_FORMAT, 2, 4096) == -1) return -1;
+	initSounds(sounds);
 	if (TTF_Init()<0) return -1;
 	loadLevel(level);
 	if (initBall(SDLvariables, ball, level) < 0) return -1;
@@ -353,10 +365,8 @@ void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level
 {
 	SDL_SetRenderDrawColor(SDLvariables.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(SDLvariables.renderer);
-	//POSSIBLE MEMORY LEAK------------------------------------
 	drawBackground(SDLvariables.renderer);											//draws backgorund
 	drawObstacles(SDLvariables.renderer, level);									//draws obstacles
-	//--------------------------------------------------------
 	SDL_RenderCopy(SDLvariables.renderer, hole.holeTexture, NULL, &hole.drawModel); //draws hole
 	SDL_RenderCopy(SDLvariables.renderer, ball.ballTexture, NULL, &ball.boxModel);  //draws ball
 	drawLevelText(level,SDLvariables.renderer, text);								//draw text
@@ -364,7 +374,7 @@ void gameRender(SDL_Variables& SDLvariables, Ball& ball, Hole& hole, Level level
 		visualiseShot(ball, SDLvariables.renderer);									//draws arrow when shooting
 	SDL_RenderPresent(SDLvariables.renderer);
 }
-void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContainer& text, SDL_Renderer* renderer)
+void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContainer& text, SDL_Renderer* renderer, Sounds sounds)
 {
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
@@ -375,7 +385,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContain
 			break;
 		case SDL_MOUSEBUTTONUP:
 			if (event.button.button == SDL_BUTTON_LEFT && ball.isMoving == false) {
-				shootBall(ball,player,text,renderer);
+				shootBall(ball,player,text,renderer,sounds);
 			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
@@ -386,7 +396,7 @@ void gameHandleEvents(Ball& ball, bool& gameRunning, Player &player, TextContain
 	}
 }
 void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& player, TextContainer& text, 
-	SDL_Renderer* renderer, Menu& menu, bool& gameRunning)
+	SDL_Renderer* renderer, Menu& menu, bool& gameRunning, Sounds sounds)
 {
 	//ball update
 	ballPositionUpdate(ball, frameTime);
@@ -394,13 +404,14 @@ void gameUpdate(Ball& ball, double frameTime, Hole& hole, Level& level, Player& 
 	ballBoxModelUpdate(ball);
 
 	//checks collision with screen
-	calculateCollisions(ball);
+	calculateCollisions(ball,sounds);
 
 	//checks collision with obstacles
-	obstaclesCollision(ball, level);
+	obstaclesCollision(ball, level,sounds);
 
 	//checks win
 	if (checkWin(ball, hole)) {
+		Mix_PlayMusic(sounds.win, 0);
 		win(renderer, level, player, text, ball, hole, menu, gameRunning);
 	}
 }
@@ -534,22 +545,23 @@ void drawObstacles(SDL_Renderer* renderer, Level level)
 		SDL_DestroyTexture(temp);
 	}
 }
-void obstaclesCollision(Ball& ball, Level level) 
+
+void obstaclesCollision(Ball& ball, Level level, Sounds sounds)
 {
 	for (SDL_Rect obstacle : level.obstacles)
 	{
 		if (circleRectangleCollision(obstacle, ball)) {
 			//play sound
+			Mix_PlayChannel(-1, sounds.collision, 0);
 			break;
 		}
 	}
 }
-
 bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball) 
 {
 	int halfWidth = obstacle.w / 2;
 	int halfHeight = obstacle.h / 2;
-	
+
 	int x = ball.x, y = ball.y, r = ball.radius;
 
 	int disX, disY;
@@ -558,7 +570,7 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 
 	if (disX > halfWidth + r || disY > halfHeight + r) return false;
 
-	if (pointInRectangle({x-r,y}, obstacle) || pointInRectangle({x+r,y}, obstacle)) {
+	if (pointInRectangle({ x - r,y }, obstacle) || pointInRectangle({ x + r,y }, obstacle)) {
 		ball.Xspeed *= -1;
 		if (x <= obstacle.x)
 			ball.x = obstacle.x - r - 1;
@@ -566,7 +578,7 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 			ball.x = obstacle.x + obstacle.w + r + 1;
 		return true;
 	}
-	if (pointInRectangle({ x,y-r }, obstacle) || pointInRectangle({ x,y+r }, obstacle)) {
+	if (pointInRectangle({ x,y - r }, obstacle) || pointInRectangle({ x,y + r }, obstacle)) {
 		ball.Yspeed *= -1;
 
 		if (y <= obstacle.y)
@@ -577,11 +589,11 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 		return true;
 	}
 
-	double disCorner = pow(disX - halfWidth, 2) + pow(disY-halfHeight, 2);
+	double disCorner = pow(disX - halfWidth, 2) + pow(disY - halfHeight, 2);
 	if (disCorner <= pow(r, 2)) {
 		ball.Xspeed *= -1;
 		ball.Yspeed *= -1;
-		if (x <= obstacle.x) 
+		if (x <= obstacle.x)
 		{
 			if (y <= obstacle.y)
 			{
@@ -594,7 +606,7 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 				ball.y = obstacle.y + obstacle.h + r + 1;
 			}
 		}
-		else 
+		else
 		{
 			if (y <= obstacle.y)
 			{
@@ -614,6 +626,7 @@ bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball)
 bool pointInRectangle(SDL_Point p, SDL_Rect rect) {
 	return (p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h);
 }
+
 void loadLevel(Level& level) {
 	string fileName = "levels/";
 	if (level.levelID < 10) {
@@ -639,7 +652,6 @@ void loadLevel(Level& level) {
 
 	file.close();
 }
-
 SDL_Surface* getObstacleSurface(SDL_Rect rectangle) {
 	SDL_Surface* asset,* surface;
 
@@ -674,10 +686,14 @@ void drawLevelText(Level level, SDL_Renderer* renderer, TextContainer text) {
 	SDL_RenderCopy(renderer, text.shotsNum.texture, NULL, &text.shotsNum.rect);
 }
 
-void gameCleanUp(SDL_Variables& SDLvariables) {
+void gameCleanUp(SDL_Variables& SDLvariables, Sounds& sounds) {
 	SDL_DestroyWindow(SDLvariables.window);
 	SDL_DestroyRenderer(SDLvariables.renderer);
+	Mix_FreeChunk(sounds.collision);
+	Mix_FreeChunk(sounds.shot);
+	Mix_FreeMusic(sounds.win);
 	TTF_Quit();
+	Mix_Quit();
 	SDL_Quit();
 }
 void renderText(SDL_Renderer* renderer, SDL_Texture*& texture, string message, SDL_Rect& rect,int x, int y, TTF_Font* font, SDL_Color color) 
@@ -721,4 +737,10 @@ void finishGame(SDL_Renderer* renderer, Player player)
 	}
 	SDL_Delay(250);
 	SDL_DestroyTexture(texture);
+}
+void initSounds(Sounds& sounds) 
+{
+	sounds.collision = Mix_LoadWAV("assets/collision.wav");
+	sounds.shot = Mix_LoadWAV("assets/shot.wav");
+	sounds.win = Mix_LoadMUS("assets/win.mp3");
 }

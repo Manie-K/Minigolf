@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
 #include <SDL_ttf.h>
 #include <vector>
 
@@ -82,4 +83,9 @@ struct Menu {
 		SDL_Texture* texture;
 		SDL_Rect rect;
 	}star;
+};
+
+struct Sounds {
+	Mix_Chunk* shot, *collision;
+	Mix_Music* win;
 };
