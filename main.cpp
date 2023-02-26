@@ -40,6 +40,6 @@ int main(int argc, char* argv[])
 	finishGame(SDLvariables.renderer,player);
 
 	//cleaning memory
-	gameCleanUp(SDLvariables, sounds);
+	gameCleanUp(SDLvariables, sounds,ball,hole,menu,text);
 	return 0;
 }

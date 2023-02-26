@@ -6,7 +6,7 @@
 #include <vector>
 
 #define BALL_FRICTION 0.006
-#define MAX_POWER 130
+#define MAX_POWER 100
 #define MAX_HOLE_SPEED 1.1
 #define MINIMUM_WIN_AREA_COLLISION 10
 

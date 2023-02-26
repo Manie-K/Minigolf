@@ -133,20 +133,32 @@ void ballSet(Ball& ball, Level level)
 
 void ballPositionUpdate(Ball& ball, double frameTime) {
 	int temp;
-
-	ball.xPosBuffer += ball.Xspeed * frameTime;
+	double tempPos;
+	tempPos= ball.Xspeed * frameTime;
+	if (tempPos > ball.radius) {
+		tempPos = ball.radius;
+	}
+	ball.xPosBuffer += tempPos;
 	if (ball.xPosBuffer >= 0)
 		temp = (int)floor(ball.xPosBuffer);
 	else
 		temp = (int)ceil(ball.xPosBuffer);
+	if (temp >= ball.radius)
+		temp = ball.radius - 1;
 	ball.x += temp;
 	ball.xPosBuffer -= temp;
 
-	ball.yPosBuffer += ball.Yspeed * frameTime;
+	tempPos = ball.Yspeed * frameTime;
+	if (tempPos > ball.radius) {
+		tempPos = ball.radius;
+	}
+	ball.yPosBuffer += tempPos;
 	if (ball.yPosBuffer >= 0)
 		temp = (int)floor(ball.yPosBuffer);
 	else
 		temp = (int)ceil(ball.yPosBuffer);
+	if (temp >= ball.radius)
+		temp = ball.radius - 1;
 	ball.y += temp;
 	ball.yPosBuffer -= temp;
 }
@@ -559,70 +571,205 @@ void obstaclesCollision(Ball& ball, Level level, Sounds sounds)
 }
 bool circleRectangleCollision(SDL_Rect obstacle, Ball& ball) 
 {
-	int halfWidth = obstacle.w / 2;
-	int halfHeight = obstacle.h / 2;
-
 	int x = ball.x, y = ball.y, r = ball.radius;
+	int w = obstacle.w, h = obstacle.h;
+	SDL_Point topLeft = { obstacle.x,obstacle.y };
+	SDL_Point topRight = { obstacle.x+w,obstacle.y };
+	SDL_Point bottomRight = { obstacle.x + w,obstacle.y + h };
+	SDL_Point bottomLeft = { obstacle.x,obstacle.y + h };
+	SDL_Point center = { obstacle.x + w / 2,obstacle.y + h / 2 };
 
-	int disX, disY;
-	disX = abs(x - (obstacle.x + halfWidth));
-	disY = abs(y - (obstacle.y + halfHeight));
+	int dx = abs(x - center.x);
+	int dy = abs(y - center.y);
 
-	if (disX > halfWidth + r || disY > halfHeight + r) return false;
+	if (dx > w / 2 + r || dy > h / 2 + r)
+		return false;
 
-	if (pointInRectangle({ x - r,y }, obstacle) || pointInRectangle({ x + r,y }, obstacle)) {
-		ball.Xspeed *= -1;
-		if (x <= obstacle.x)
-			ball.x = obstacle.x - r - 1;
-		else
-			ball.x = obstacle.x + obstacle.w + r + 1;
-		return true;
-	}
-	if (pointInRectangle({ x,y - r }, obstacle) || pointInRectangle({ x,y + r }, obstacle)) {
-		ball.Yspeed *= -1;
-
-		if (y <= obstacle.y)
-			ball.y = obstacle.y - r;
-		else
-			ball.y = obstacle.y + obstacle.h + r + 1;
-
-		return true;
-	}
-
-	double disCorner = pow(disX - halfWidth, 2) + pow(disY - halfHeight, 2);
-	if (disCorner <= pow(r, 2)) {
-		ball.Xspeed *= -1;
-		ball.Yspeed *= -1;
-		if (x <= obstacle.x)
+	//top/bottom collision
+	if (x > topLeft.x && x < topRight.x) {
+		if (y<topLeft.y || y > bottomLeft.y) 
 		{
-			if (y <= obstacle.y)
-			{
-				ball.x = obstacle.x - r - 1;
-				ball.y = obstacle.y - r;
-			}
-			else
-			{
-				ball.x = obstacle.x - r - 1;
-				ball.y = obstacle.y + obstacle.h + r + 1;
-			}
+			ball.Yspeed = -ball.Yspeed;
+			if (y < topLeft.y)
+				ball.y = topLeft.y - r - 1;
+			else if (y > bottomLeft.y)
+				ball.y = bottomLeft.y + r + 1;
+			return true;
 		}
-		else
+	}
+	//side collision
+	if (y > topLeft.y && y < bottomLeft.y) {
+		if (x < topLeft.x || x > topRight.x)
 		{
-			if (y <= obstacle.y)
-			{
-				ball.x = obstacle.x + obstacle.w + r + 1;
-				ball.y = obstacle.y - r;
-			}
-			else
-			{
-				ball.x = obstacle.x + obstacle.w + r + 1;
-				ball.y = obstacle.y + obstacle.h + r + 1;
-			}
+			ball.Xspeed = -ball.Xspeed;
+			if (x < topLeft.x)
+				ball.x = topLeft.x - r - 1;
+			else if (x > topRight.x)
+				ball.x = topRight.x + r + 1;
+			return true;
 		}
-		return true;
+	}
+	dx = dy = 0;
+	if (ball.Xspeed != 0) 
+	{
+		bool x = cornerCollision(ball, obstacle);
+		if(x) return true;
+	}
+	else {
+		//vertical
+		if (y - bottomLeft.y <= r || topLeft.y - y <= r) {
+			ball.Yspeed = -ball.Yspeed;
+			if (y < topLeft.y) {
+				ball.y = topLeft.y - r - 1;
+			}
+			else if (y > bottomLeft.y) {
+				ball.y = bottomLeft.y + r + 1;
+			}
+			return true;
+		}
+	}
+
+	return false;
+}
+bool cornerCollision(Ball&ball, SDL_Rect& obstacle)
+{
+	int x = ball.x, y = ball.y, r = ball.radius;
+	int w = obstacle.w, h = obstacle.h;
+	SDL_Point topLeft = { obstacle.x,obstacle.y };
+	SDL_Point topRight = { obstacle.x + w,obstacle.y };
+	SDL_Point bottomRight = { obstacle.x + w,obstacle.y + h };
+	SDL_Point bottomLeft = { obstacle.x,obstacle.y + h };
+	/*
+	   11|12  1|2
+		---------
+	   10|     |3
+		9|     |4
+		---------
+		8|7   6|5
+	*/
+
+	//0 - ball stationary
+	if (ball.Xspeed == 0 && ball.Yspeed == 0)
+		return false;
+	//1
+	if (ball.Xspeed>=0 &&x > topLeft.x + w / 2 && x <= topRight.x){
+		if (y <= topLeft.y && y >= topLeft.y - r) {
+			cout << "Collision type 1\n";
+			ball.Yspeed = -ball.Yspeed;
+			ball.y = topLeft.y - r - 1;
+			return true;
+		}
+	}
+	//2
+	if (ball.Xspeed <= 0&&ball.Yspeed>=0 && x >= topRight.x && x <= topRight.x +r) {
+		if (y <= topLeft.y && y >= topLeft.y - r) {
+			cout << "Collision type 2\n";
+			ball.Yspeed = -ball.Yspeed;
+			ball.Xspeed = -ball.Xspeed;
+			ball.x = topRight.x + r + 1;
+			ball.y = topRight.y - r - 1;
+			return true;
+		}
+	}
+	//3
+	if (ball.Yspeed <= 0 && y >= topRight.y && y < topRight.y + h / 2) {
+		if (x >= topRight.x && x <= topRight.x + r)
+		{
+			cout << "Collision type 3\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.x = topRight.x + r + 1;
+			return true;
+		}
+	}
+	//4
+	if (ball.Yspeed >= 0 && y > topRight.y + r && y <= bottomRight.y) {
+		if (x >= topRight.x && x <= topRight.x + r) {
+			cout << "Collision type 4\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.x = bottomRight.x + r + 1;
+			return true;
+		}
+	}
+	//5
+	if (ball.Xspeed <= 0 && ball.Yspeed <= 0 && x >= bottomRight.x && x <= topRight.x + r) {
+		if (y >= bottomRight.y && y <= bottomRight.y + r) {
+			cout << "Collision type 5\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.Yspeed = -ball.Yspeed;
+			ball.x = bottomRight.x + r + 1;
+			ball.y = bottomRight.y + r + 1;
+			return true;
+		}
+	}
+	//6
+	if (ball.Xspeed >= 0 && x > topLeft.x + w / 2 && x <= topRight.x) {
+		if (y >= bottomLeft.y && y <= bottomLeft.y + r) {
+			cout << "Collision type 6\n";
+			ball.Yspeed = -ball.Yspeed;
+			ball.y = bottomLeft.y + r + 1;
+			return true;
+		}
+	}
+	//7
+	if (ball.Xspeed <= 0 && x >= topLeft.x -r  && x <= topLeft.x) {
+		if (y >= bottomLeft.y && y <= bottomLeft.y + r) {
+			cout << "Collision type 7\n";
+			ball.Yspeed = -ball.Yspeed;
+			ball.y = bottomLeft.y + r + 1;
+			return true;
+		}
+	}
+	//8
+	if (ball.Xspeed >= 0 && ball.Yspeed <= 0 && x >= topLeft.x - r && x <= topLeft.x) {
+		if (y >= bottomLeft.y && y <= bottomLeft.y + r) {
+			cout << "Collision type 8\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.Yspeed = -ball.Yspeed;
+			ball.x = topLeft.x - r - 1;
+			ball.y = bottomLeft.y + r + 1;
+			return true;
+		}
+	}
+	//9
+	if (ball.Yspeed >= 0 && y <= bottomLeft.y && y > bottomLeft.y - h / 2) {
+		if (x >= topLeft.x - r && x <= topLeft.x) {
+			cout << "Collision type 9\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.x = topLeft.x - r - 1;
+			return true;
+		}
+	}
+	//10
+	if (ball.Yspeed <= 0 && y < bottomLeft.y - h / 2 && y >= topLeft.y) {
+		if (x >= topLeft.x - r && x <= topLeft.x) {
+			cout << "Collision type 10\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.x = topLeft.x - r - 1;
+			return true;
+		}
+	}
+	//11
+	if (ball.Xspeed >= 0 && ball.Yspeed >= 0 && x >= topLeft.x - r && x <= topLeft.x) {
+		if (y <= topLeft.y && y >= topLeft.y - r) {
+			cout << "Collision type 11\n";
+			ball.Xspeed = -ball.Xspeed;
+			ball.Yspeed = -ball.Yspeed;
+			ball.x = topLeft.x - r - 1;
+			ball.y = topLeft.y - r - 1;
+			return true;
+		}
+	}
+	//12
+	if (ball.Xspeed<=0 && x >=topLeft.x && x < topLeft.x+w/2) {
+		if (y >= topLeft.y - r && y <= topLeft.y) {
+			ball.Yspeed = -ball.Yspeed;
+			ball.y = topLeft.y - r - 1;
+			return true;
+		}
 	}
 	return false;
 }
+
 bool pointInRectangle(SDL_Point p, SDL_Rect rect) {
 	return (p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h);
 }
@@ -686,16 +833,34 @@ void drawLevelText(Level level, SDL_Renderer* renderer, TextContainer text) {
 	SDL_RenderCopy(renderer, text.shotsNum.texture, NULL, &text.shotsNum.rect);
 }
 
-void gameCleanUp(SDL_Variables& SDLvariables, Sounds& sounds) {
+void gameCleanUp(SDL_Variables& SDLvariables, Sounds& sounds, Ball& ball, Hole& hole, Menu& menu, TextContainer& txt) 
+{
+	textCleanUp(txt);
 	SDL_DestroyWindow(SDLvariables.window);
 	SDL_DestroyRenderer(SDLvariables.renderer);
 	Mix_FreeChunk(sounds.collision);
 	Mix_FreeChunk(sounds.shot);
 	Mix_FreeMusic(sounds.win);
+	SDL_DestroyTexture(ball.ballTexture);
+	SDL_DestroyTexture(hole.holeTexture);
+	SDL_DestroyTexture(menu.star.texture);
+	SDL_DestroyTexture(menu.menuTexture);
+
+
 	TTF_Quit();
 	Mix_Quit();
 	SDL_Quit();
 }
+void textCleanUp(TextContainer &txt) 
+{
+	SDL_DestroyTexture(txt.levelNum.texture);
+	SDL_DestroyTexture(txt.scoreNum.texture);
+	SDL_DestroyTexture(txt.shotsNum.texture);
+	SDL_DestroyTexture(txt.staticText.level.texture);
+	SDL_DestroyTexture(txt.staticText.score.texture);
+	SDL_DestroyTexture(txt.staticText.shots.texture);
+}
+
 void renderText(SDL_Renderer* renderer, SDL_Texture*& texture, string message, SDL_Rect& rect,int x, int y, TTF_Font* font, SDL_Color color) 
 {
 	SDL_Surface* temp;

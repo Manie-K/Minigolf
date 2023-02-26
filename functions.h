@@ -44,7 +44,9 @@ void showNextLevelMenu(SDL_Renderer* renderer, Menu& menu, Player& player, int t
 void renderStars(SDL_Renderer* renderer, Menu& menu, const int numOfStars);
 void renderMenuText(SDL_Renderer* renderer, Player& player, int tempScore);
 
-void gameCleanUp(SDL_Variables& SDLvariables, Sounds &sounds);
+void gameCleanUp(SDL_Variables& SDLvariables, Sounds &sounds, Ball &ball,Hole& hole,Menu& menu, TextContainer& txt);
+void textCleanUp(TextContainer& txt);
 void finishGame(SDL_Renderer* renderer, Player player);
 void renderText(SDL_Renderer* renderer, SDL_Texture*& texture, std::string message, SDL_Rect& rect, int x, int y, TTF_Font* font, SDL_Color color);
 void initSounds(Sounds& sounds);
+bool cornerCollision(Ball& ball, SDL_Rect& obstacle);
